@@ -142,6 +142,15 @@ class HardLimitsImplTest : TestBase() {
         whenever(preferences.get(StringKey.SafetyAge)).thenReturn("child")
         assertThat(hardLimits.maxDia()).isEqualTo(12.0)
 
+        whenever(preferences.get(StringKey.SafetyAge)).thenReturn("teenage")
+        assertThat(hardLimits.maxDia()).isEqualTo(12.0)
+
+        whenever(preferences.get(StringKey.SafetyAge)).thenReturn("adult")
+        assertThat(hardLimits.maxDia()).isEqualTo(12.0)
+
+        whenever(preferences.get(StringKey.SafetyAge)).thenReturn("resistantadult")
+        assertThat(hardLimits.maxDia()).isEqualTo(12.0)
+
         whenever(preferences.get(StringKey.SafetyAge)).thenReturn("pregnant")
         assertThat(hardLimits.maxDia()).isEqualTo(12.0)
     }
