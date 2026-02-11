@@ -14,8 +14,9 @@ The repository includes two Claude Code workflows that are **disabled by default
 To enable these workflows, a repository administrator needs to:
 
 1. Set up the Claude Code OAuth token:
-   - Go to repository Settings > Secrets and variables > Actions
+   - Go to repository Settings > Secrets and variables > Actions > Secrets tab
    - Add a secret named `CLAUDE_CODE_OAUTH_TOKEN` with your Claude Code OAuth token
+   - The Claude Code action uses this OAuth token internally, and GitHub Actions provides OIDC tokens automatically
 
 2. Enable the workflows:
    - Go to repository Settings > Secrets and variables > Actions > Variables tab
@@ -23,7 +24,7 @@ To enable these workflows, a repository administrator needs to:
 
 ### Why are these workflows disabled by default?
 
-These workflows are disabled to prevent CI failures when the Claude Code integration is not fully configured. Without proper OIDC token configuration, the workflows would fail with "401 Unauthorized - Invalid OIDC token" errors.
+These workflows are disabled to prevent CI failures when the Claude Code integration is not fully configured. The workflows use GitHub Actions' OIDC (OpenID Connect) tokens for authentication with the Claude Code service. Without the proper `CLAUDE_CODE_OAUTH_TOKEN` secret configured, the OIDC token exchange would fail with "401 Unauthorized - Invalid OIDC token" errors.
 
 ## Other Workflows
 
