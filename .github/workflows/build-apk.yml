@@ -59,6 +59,10 @@ jobs:
             VERSION="$BRANCH_NAME"
           else
             VERSION=$(grep 'val appVersion' buildSrc/src/main/kotlin/Versions.kt | awk -F '"' '{print $2}')
+            if [ -z "$VERSION" ]; then
+              VERSION="${{ github.sha }}"
+              echo "⚠️ Could not extract version from buildSrc, using commit SHA: $VERSION"
+            fi
           fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
