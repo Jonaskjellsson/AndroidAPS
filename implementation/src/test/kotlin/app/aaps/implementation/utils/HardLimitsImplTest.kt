@@ -140,10 +140,10 @@ class HardLimitsImplTest : TestBase() {
     @Test
     fun `maxDia returns correct values for all ages`() {
         whenever(preferences.get(StringKey.SafetyAge)).thenReturn("child")
-        assertThat(hardLimits.maxDia()).isEqualTo(9.0)
+        assertThat(hardLimits.maxDia()).isEqualTo(12.0)
 
         whenever(preferences.get(StringKey.SafetyAge)).thenReturn("pregnant")
-        assertThat(hardLimits.maxDia()).isEqualTo(10.0)
+        assertThat(hardLimits.maxDia()).isEqualTo(12.0)
     }
 
     @Test
