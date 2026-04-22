@@ -1,0 +1,107 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      buildVariant:
+        description: 'Select Build Variant'
+        required: true
+        default: 'fullDebug'
+        type: choice
+        options:
+          - fullDebug
+          - pumpcontrolDebug
+          - aapsclientDebug
+          - aapsclient2Debug
+          - fullRelease
+          - pumpcontrolRelease
+          - aapsclientRelease
+          - aapsclient2Release
+  push:
+    branches:
+      - master
+      - dev
+  pull_request:
+    branches:
+      - master
+      - dev
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Set BUILD_VARIANT
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            BUILD_VARIANT="${{ github.event.inputs.buildVariant }}"
+          else
+            BUILD_VARIANT="fullDebug"
+          fi
+          echo "BUILD_VARIANT=$BUILD_VARIANT" >> $GITHUB_ENV
+          VARIANT_FLAVOR=$(echo "$BUILD_VARIANT" | sed -E 's/(Release|Debug)$//' | tr '[:upper:]' '[:lower:]')
+          VARIANT_TYPE=$(echo "$BUILD_VARIANT" | grep -oE '(Release|Debug)$' | tr '[:upper:]' '[:lower:]')
+          echo "VARIANT_FLAVOR=$VARIANT_FLAVOR" >> $GITHUB_ENV
+          echo "VARIANT_TYPE=$VARIANT_TYPE" >> $GITHUB_ENV
+          VERSION_SUFFIX=""
+          if [[ "$VARIANT_FLAVOR" != "full" ]]; then VERSION_SUFFIX="$VARIANT_FLAVOR"; fi
+          if [[ "$VARIANT_TYPE" == "debug" ]]; then VERSION_SUFFIX="$VERSION_SUFFIX-debug"; fi
+          if [[ -n "$VERSION_SUFFIX" && "$VERSION_SUFFIX" != -* ]]; then VERSION_SUFFIX="-$VERSION_SUFFIX"; fi
+          echo "VERSION_SUFFIX=$VERSION_SUFFIX" >> $GITHUB_ENV
+
+      - name: Extract VERSION
+        run: |
+          BRANCH_NAME="${{ github.ref_name }}"
+          if echo "$BRANCH_NAME" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
+            VERSION="$BRANCH_NAME"
+          else
+            VERSION=$(grep 'val appVersion' buildSrc/src/main/kotlin/Versions.kt | awk -F '"' '{print $2}')
+            if [ -z "$VERSION" ]; then
+              VERSION="${{ github.sha }}"
+              echo "⚠️ Could not extract version from buildSrc, using commit SHA: $VERSION"
+            fi
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build APKs
+        run: |
+          ./gradlew :app:assemble${{ env.BUILD_VARIANT }} :wear:assemble${{ env.BUILD_VARIANT }} \
+            -Dorg.gradle.jvmargs="-Xmx8g -XX:+UseParallelGC -Xss1024m" \
+            -Dkotlin.daemon.jvm.options="-Xmx2g" \
+            -Dkotlin.compiler.execution.strategy="in-process" \
+            -Dorg.gradle.daemon=true \
+            -Dorg.gradle.workers.max=8 \
+            -Dorg.gradle.caching=true
+
+      - name: Rename APKs with version
+        run: |
+          mkdir -p apk-output
+          if ls app/build/outputs/apk/${{ env.VARIANT_FLAVOR }}/${{ env.VARIANT_TYPE }}/*.apk 1> /dev/null 2>&1; then
+            cp app/build/outputs/apk/${{ env.VARIANT_FLAVOR }}/${{ env.VARIANT_TYPE }}/*.apk apk-output/aaps-${{ env.VERSION }}${{ env.VERSION_SUFFIX }}.apk
+          fi
+          if ls wear/build/outputs/apk/${{ env.VARIANT_FLAVOR }}/${{ env.VARIANT_TYPE }}/*.apk 1> /dev/null 2>&1; then
+            cp wear/build/outputs/apk/${{ env.VARIANT_FLAVOR }}/${{ env.VARIANT_TYPE }}/*.apk apk-output/aaps-wear-${{ env.VERSION }}${{ env.VERSION_SUFFIX }}.apk
+          fi
+          ls -lah apk-output/
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: aaps-apk-${{ env.VERSION }}${{ env.VERSION_SUFFIX }}
+          path: apk-output/*.apk
+          retention-days: 30
